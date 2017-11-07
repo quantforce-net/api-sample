@@ -57,6 +57,20 @@ namespace common.Helpers
             return JsonConvert.DeserializeObject<T>(s);
         }
 
+        public async Task<T> PostFileAsync<T>(string uri, byte[] data, int offset, int length)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, uri);
+            request.Content = new System.Net.Http.ByteArrayContent(data, offset, length);
+            var response = await Client().SendAsync(request).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.NotFound)
+            {
+                throw new Exception("Request failed:" + await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+            }
+            response.EnsureSuccessStatusCode();
+            var s = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<T>(s);
+        }
+
         public async Task<T> PutAsync<T>(string uri, object data = null)
         {
             var response = await SendAsync(HttpMethod.Put, uri, JsonConvert.SerializeObject(data));
