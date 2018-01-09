@@ -1,88 +1,95 @@
 ﻿using System;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
+using System.Threading.Tasks;
 
 namespace quantforce
 {
     class Program
     {
+        static async Task<int> WaitForTaskToCompleteAsync(dynamic task, common.Helpers.Rest rest, string uri)
+        {
+            int status = 0;
+            while (status < 400)
+            {
+                await Task.Delay(500);
+                dynamic taskResult = await rest.GetAsync<JToken>(uri + "/task/" + task.taskId);
+                status = taskResult.status;
+            }
+            return status;
+        }
+
         static void Main(string[] args)
         {
             // Get token from environment or from command line
             string token = Environment.ExpandEnvironmentVariables("%quantforce-token%");
-            string baseUrl = Environment.ExpandEnvironmentVariables("%quantforce-url%");
+            string nodeUrl = Environment.ExpandEnvironmentVariables("%quantforce-url%");
             string version = "/api/v1";
             // Prepare Rest class. The token will ba added to header each call
             common.Helpers.Rest rest = new common.Helpers.Rest(token);
 
             // Retreive project node type
-            var types = rest.GetAsync<List<NodeType>>(baseUrl + version + "/helper/types").Result;
+            var types = rest.GetAsync<List<NodeType>>(nodeUrl + version + "/helper/types").Result;
 
             // Find all the node I have access to
-            var nodes = rest.GetAsync<List<NodeView>>(baseUrl + version + "/node").Result;
+            var nodes = rest.GetAsync<List<NodeView>>(nodeUrl + version + "/node").Result;
+            string projectName = "QQ Project";
 
             if (nodes.Count > 0)
             {
                 // Use the root node and see if the project exists
-                var projects = rest.GetAsync<List<NodeView>>(baseUrl + version + "/node/" + nodes[0].id + "/childs?type=" + types.Find(a => a.name == "Project").type.ToString()).Result;
+                var projects = rest.GetAsync<List<NodeView>>(nodeUrl + version + "/node/" + nodes[0].id + "/childs?type=" + types.Find(a => a.name == "Project").type.ToString()).Result;
                 // Does my test project exists?
-                var project = projects.Find(a => a.name == "Test project");
-                if (project==null) // Create the project
+                var project = projects.Find(a => a.name == projectName);
+                if (project == null) // Create the project
+                    project = rest.PostAsync<NodeView>(nodeUrl + version + "/project/create?parentId=" + nodes[0].id + "&subType=1&name=" + Uri.EscapeDataString(projectName), new { comment = "My comment " }).Result;
+
+                // Get the full node to get processURI
+                NodeView fullNode = rest.GetAsync<NodeView>(nodeUrl + version + "/node/" + project.id).Result;
+                string dataURI = ((dynamic)fullNode.inheritedJson).dataURI;
+                string processURI = ((dynamic)fullNode.inheritedJson).processURI;
+
+                // Upload the data.
+                // 1) Create the file and get data serveur URI
+                string fileName = "qq_model_creation.csv";
+                dynamic file = rest.PostAsync<NodeView>(nodeUrl + version + "/file?name=" + Uri.EscapeDataString(fileName) + "&parentId=" + project.id).Result;
+
+                // 2) Upload the file in chunk of 1 MB
+                System.IO.FileInfo fi = new System.IO.FileInfo(fileName);
+                using (var stream = System.IO.File.OpenRead(fileName))
                 {
-                    // The header is
-                    // Nummer,Factuurnummer,Factuurdatum,Vervaldatum,Bedrag,Bedrag_open,Bedrag_betaald,Datum_betaald
-                    project = rest.PostAsync<NodeView>(baseUrl + version + "/project/createQQ?parentId=" + nodes[0].id, new QQ()
+                    byte[] data = new byte[1024 * 1024];
+                    long size = fi.Length;
+                    int chunk = 1;
+                    while (size > 0)
                     {
-                        projectName = "Test project",
-                        ClientIdColumnName = "Nummer",
-                        InvoiceIdColumnName = "Factuurnummer",
-                        InvoiceDateColumnName = "Factuurdatum",
-                        InvoiceTermColumnName = "Vervaldatum",
-                        InvoiceAmountColumnName = "Bedrag",
-                        InvoicePaymentColumnName = "Datum_betaald"
-                    }).Result;
-
-                    // Upload the data
-                    // 1) Create the node and get data serveur URI
-                    dynamic file = rest.PostAsync<NodeView>(baseUrl + version + "/file?name=" + System.Net.WebUtility.UrlEncode("My file") + "&parentId=" + project.id).Result;
-                    string dataURI = file.dataURI;
-
-                    // 2) Upload the file in chunk of 1 MB
-                    string fileName = "qq_model_creation.csv";
-                    System.IO.FileInfo fi = new System.IO.FileInfo(fileName);
-                    using (var stream = System.IO.File.OpenRead(fileName))
-                    {
-                        byte[] data = new byte[1024 * 1024];
-                        long size = fi.Length;
-                        int chunk = 1;
-                        while (size>0)
-                        {
-                            int read = stream.Read(data, 0, 1024 * 1024);
-                            size -= read;
-                            dynamic tmp = rest.PostFileAsync<Newtonsoft.Json.Linq.JToken>(dataURI + version + "/" + file.id + "/" + chunk, data, 0, read);
-                            chunk++;
-                            Console.WriteLine("Chunk {0} uploaded, MD5 = {1}", tmp.chunk, tmp.MD5);
-                        }
-                    }
-
-                    // 3) Attach the file to the node
-                    dynamic task = rest.PostAsync<Newtonsoft.Json.Linq.JToken>(dataURI + version + "/" + file.id + "/process");
-
-                    // 4) Wait for the file integration
-                    int status = 0;
-                    while (status<400)
-                    {
-                        System.Threading.Thread.Sleep(1000);
-                        dynamic taskResult = rest.GetAsync<Newtonsoft.Json.Linq.JToken>(dataURI + "/" + task.taskId);
-                        status = taskResult.status;
-                    }
-
-                    if (status==400)
-                    {
-
+                        int read = stream.Read(data, 0, 1024 * 1024);
+                        size -= read;
+                        dynamic tmp = rest.PostFileAsync<JToken>(dataURI + version + "/file/" + file.id + "/" + chunk, data, 0, read).Result;
+                        chunk++;
+                        Console.WriteLine("Chunk {0} uploaded, MD5 = {1}", tmp.chunk, tmp.MD5);
                     }
                 }
-            }
 
+                // 3) Attach the file to the node
+                dynamic task = rest.GetAsync<JToken>(dataURI + version + "/file/" + file.id + "/process").Result;
+                int status = WaitForTaskToCompleteAsync(task, rest, dataURI + version).Result;
+                if (status == 400)
+                {
+                    // 5) Execute QQ
+                    ActionView av = new ActionView()
+                    {
+                        name = "TMPROCESS",
+                        verb = "",
+                        parameters = JObject.FromObject(new { DeliquencyDays = 90, DataFile = file.id })
+                    };
+                    dynamic process = rest.PostAsync<JToken>(processURI + version + "/process/" + project.id + "/action", av).Result;
+                    status = WaitForTaskToCompleteAsync(process, rest, processURI + version);
+                    // Get the result json
+                    Process_Out result = rest.GetAsync<Process_Out>(processURI + version + "/task/" + process.taskId + "/result").Result;
+                    Console.WriteLine(result.result.ToString());
+                }
+            }
         }
     }
 }
