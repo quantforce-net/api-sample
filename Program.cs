@@ -19,6 +19,14 @@ namespace quantforce
             return status;
         }
 
+        static public string GetHexa(byte[] hash)
+        {
+            string sb = "";
+            foreach (byte h in hash)
+                sb += h.ToString("x2");
+            return sb;
+        }
+
         static void Main(string[] args)
         {
             // Get token from environment or from command line
@@ -64,10 +72,11 @@ namespace quantforce
                     while (size > 0)
                     {
                         int read = stream.Read(data, 0, 1024 * 1024);
+                        var md5 = GetHexa(System.Security.Cryptography.MD5.Create().ComputeHash(data, 0, read));
                         size -= read;
                         dynamic tmp = rest.PostFileAsync<JToken>(dataURI + version + "/file/" + file.id + "/" + chunk, data, 0, read).Result;
                         chunk++;
-                        Console.WriteLine("Chunk {0} uploaded, MD5 = {1}", tmp.chunk, tmp.MD5);
+                        Console.WriteLine("Chunk {0} uploaded, MD5 = {1} :{2}", tmp.chunk, tmp.md5, tmp.md5==md5);
                     }
                 }
 
