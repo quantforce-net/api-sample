@@ -41,9 +41,9 @@ namespace common.Helpers
             return response;
         }
 
-        public async Task<T> GetAsync<T>(string uri)
+        public async Task<T> GetAsync<T>(string uri, object data = null)
         {
-            var response = await SendAsync(HttpMethod.Get, uri);
+            var response = await SendAsync(HttpMethod.Get, uri, JsonConvert.SerializeObject(data));
             response.EnsureSuccessStatusCode();
             string s = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<T>(s);

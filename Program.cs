@@ -43,14 +43,31 @@ namespace quantforce
             NodeView account = new NodeView();
             account.publicJson = new JObject();
             account.publicJson["email"] = "test@test.com";
-            account.publicJson["MD5password"] = "111"; // tbd
+            account.publicJson["MD5password"] = "111"; // You only send password MD5, never send the real password
             account.publicJson["companyName"] = "acme";
             account.publicJson["lastName"] = "tom";
             account.publicJson["firstName"] = "Ber";
             account.publicJson["sex"] = "M";
             account.publicJson["phone"] = "+33123456789";
+            account.publicJson["extrainfo"] = "Anything";
 
-            var acc = rest.PostAsync<NodeView>(nodeUrl + version + "/account", account).Result;
+            // Does this user exist?
+            JObject existingUser = rest.PostAsync<JObject>(nodeUrl + version + "/account/find", account).Result;
+            if (existingUser["tokens"] != null)
+            {
+                Console.WriteLine(existingUser);
+                dynamic acc = existingUser;
+                token = acc.tokens[0].id;
+            }
+            else
+            {
+                // Create this user
+                // To update this user use the same method. Because you have special token that is allow to do it
+                dynamic acc = rest.PostAsync<JObject>(nodeUrl + version + "/account", account).Result;
+                Console.WriteLine(acc);
+                token = acc.tokens[0].id;
+            }
+            rest = new common.Helpers.Rest(token);
 
             // Retreive project node type
             var types = rest.GetAsync<List<NodeType>>(nodeUrl + version + "/helper/types").Result;
