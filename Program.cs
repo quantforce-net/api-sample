@@ -56,6 +56,22 @@ namespace quantforce
             if (existingUser["tokens"] != null)
             {
                 Console.WriteLine(existingUser);
+                /*
+{{
+  "user": {
+    "email": "test@test.com",
+    "MD5password": "111",
+    "companyName": "acme",
+    "lastName": "tom",
+    "firstName": "Ber",
+    "sex": "M",
+    "phone": "+33123456789"
+  },
+  "tokens": [
+    "91435f7d-297c-4bb6-887a-xx"
+  ]
+}}
+                 */
                 dynamic acc = existingUser;
                 token = acc.tokens[0].id;
             }
@@ -65,6 +81,22 @@ namespace quantforce
                 // To update this user use the same method. Because you have special token that is allow to do it
                 dynamic acc = rest.PostAsync<JObject>(nodeUrl + version + "/account", account).Result;
                 Console.WriteLine(acc);
+                /*
+{{
+  "user": {
+    "email": "test@test.com",
+    "MD5password": "111",
+    "companyName": "acme",
+    "lastName": "tom",
+    "firstName": "Ber",
+    "sex": "M",
+    "phone": "+33123456789"
+  },
+  "tokens": [
+    "91435f7d-297c-4bb6-887a-xx"
+  ]
+}}
+                 */
                 token = acc.tokens[0].id;
             }
             rest = new common.Helpers.Rest(token);
