@@ -27,6 +27,10 @@ namespace quantforce
             return sb;
         }
 
+        static void CreateAccount(string nodeUrl, common.Helpers.Rest rest)
+        {
+        }
+
         static void Main(string[] args)
         {
             // Get token from environment or from command line
@@ -35,6 +39,18 @@ namespace quantforce
             string version = "/api/v1";
             // Prepare Rest class. The token will ba added to header each call
             common.Helpers.Rest rest = new common.Helpers.Rest(token);
+
+            NodeView account = new NodeView();
+            account.publicJson = new JObject();
+            account.publicJson["email"] = "test@test.com";
+            account.publicJson["MD5password"] = "111"; // tbd
+            account.publicJson["companyName"] = "acme";
+            account.publicJson["lastName"] = "tom";
+            account.publicJson["firstName"] = "Ber";
+            account.publicJson["sex"] = "M";
+            account.publicJson["phone"] = "+33123456789";
+
+            var acc = rest.PostAsync<NodeView>(nodeUrl + version + "/account", account).Result;
 
             // Retreive project node type
             var types = rest.GetAsync<List<NodeType>>(nodeUrl + version + "/helper/types").Result;
