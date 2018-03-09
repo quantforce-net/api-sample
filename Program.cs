@@ -128,12 +128,12 @@ namespace quantforce
                 dynamic file = rest.PostAsync<NodeView>(nodeUrl + version + "/file?name=" + Uri.EscapeDataString(fileName) + "&parentId=" + project.id).Result;
 
                 // 2) Upload the file in chunk of 1 MB
+                int chunk = 1;
                 System.IO.FileInfo fi = new System.IO.FileInfo(fileName);
                 using (var stream = System.IO.File.OpenRead(fileName))
                 {
                     byte[] data = new byte[1024 * 1024];
                     long size = fi.Length;
-                    int chunk = 1;
                     while (size > 0)
                     {
                         int read = stream.Read(data, 0, 1024 * 1024);
@@ -146,7 +146,7 @@ namespace quantforce
                 }
 
                 // 3) Attach the file to the node
-                dynamic task = rest.GetAsync<JToken>(dataURI + version + "/file/" + file.id + "/process").Result;
+                dynamic task = rest.GetAsync<JToken>(dataURI + version + "/file/" + file.id + "/process?chunkCount=" + (chunk-1).ToString()).Result;
                 int status = WaitForTaskToCompleteAsync(task, rest, dataURI + version).Result;
                 if (status == 400)
                 {
