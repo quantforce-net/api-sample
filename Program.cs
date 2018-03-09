@@ -73,7 +73,7 @@ namespace quantforce
 }}
                  */
                 dynamic acc = existingUser;
-                token = acc.tokens[0].id;
+                token = acc.tokens[0];
             }
             else
             {
@@ -97,7 +97,7 @@ namespace quantforce
   ]
 }}
                  */
-                token = acc.tokens[0].id;
+                token = acc.tokens[0];
             }
             rest = new common.Helpers.Rest(token);
 
