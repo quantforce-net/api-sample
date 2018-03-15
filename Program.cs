@@ -2,11 +2,71 @@
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace quantforce
 {
     class Program
     {
+        static string GetFileMD5(string fileName)
+        {
+            string md5 = "";
+            using (var targetStream = System.IO.File.Open(fileName, FileMode.Open))
+                md5 = GetHexa(System.Security.Cryptography.MD5.Create().ComputeHash(targetStream));
+            return md5;
+        }
+
+        static public async Task Downloadfile(string token, string nodeUri, string fileId, string fileName)
+        {
+            // Find the dataURI
+            // dataURI is in the node
+            //{
+            //    "v" : "1.0",
+            //    "dataURI" : "http://data.m4f.eu:8080"
+            //}
+
+            var rest = new common.Helpers.Rest(token);
+            NodeView node = rest.GetAsync<NodeView>(nodeUri +"/node/" + fileId).Result;
+            string dataUri = null;
+            if (node != null && node.inheritedJson != null)
+                dataUri = node.inheritedJson.Value<string>("dataURI");
+            if (dataUri != null)
+            {
+                dynamic task = await rest.GetAsync<JObject>(dataUri + "/file/" + fileId + "/checkout");
+                while (task.taskId > 0 && task.state < 400)
+                {
+                    await Task.Delay(1000);
+                    task = await rest.GetAsync<JObject>(dataUri + "/task/" + fileId);
+                }
+                if (task.state == 400)
+                {
+                    dynamic taskResult = await rest.GetAsync<JObject>(dataUri + "/task/" + fileId + "/result");
+                    DataCheckout_Out co = taskResult.result.ToObject<DataCheckout_Out>();
+                    try
+                    {
+                        using (System.IO.FileStream streamOut = System.IO.File.Create(fileName))
+                        {
+                            foreach (DataOut _do in co.dataOut)
+                            {
+                                var chunk = await rest.SendAsync(System.Net.Http.HttpMethod.Get, dataUri + "/file/" + fileId + "/chunk/" + _do.chunkId);
+                                chunk.EnsureSuccessStatusCode();
+                                var streamIn = await chunk.Content.ReadAsStreamAsync();
+                                await streamOut.CopyToAsync(streamIn);
+                            }
+                        }
+                        // Check the MD5
+                        if (co.MD5_Final != GetFileMD5(fileName))
+                            throw new Exception("MD5 is not correct");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.IO.File.Delete(fileName);
+                        throw ex;
+                    }
+                }
+            }
+        }
+
         static async Task<int> WaitForTaskToCompleteAsync(dynamic task, common.Helpers.Rest rest, string uri)
         {
             int status = 0;
@@ -42,7 +102,7 @@ namespace quantforce
 
             NodeView account = new NodeView();
             account.publicJson = new JObject();
-            account.publicJson["email"] = "test@test.com";
+            account.publicJson["email"] = "test2@test.com";
             account.publicJson["MD5password"] = "111"; // You only send password MD5, never send the real password
             account.publicJson["companyName"] = "acme";
             account.publicJson["lastName"] = "tom";
@@ -122,6 +182,30 @@ namespace quantforce
                 string dataURI = ((dynamic)fullNode.inheritedJson).dataURI;
                 string processURI = ((dynamic)fullNode.inheritedJson).processURI;
 
+
+                //// 5) Execute QQ
+                //ActionView av = new ActionView()
+                //{
+                //    name = "TMPROCESS",
+                //    verb = "",
+                //    parameters = JObject.FromObject(new { DeliquencyDays = 90, DataFile = 0 })
+                //};
+                //dynamic process = rest.PostAsync<JToken>(processURI + version + "/process/" + project.id + "/action", av).Result;
+                //WaitForTaskToCompleteAsync(process, rest, processURI + version).Wait();
+                //// Get the result json
+                //Process_Out result = rest.GetAsync<Process_Out>(processURI + version + "/task/" + process.taskId + "/result").Result;
+                //Console.WriteLine(result.result.ToString());
+                //// Find the files Excel et Json child from project
+                //var files = rest.GetAsync<List<NodeView>>(nodeUrl + version + "/file/" + project.id).Result;
+                //foreach (NodeView nv in files)
+                //{
+                //    if (nv.name == "results.xlsx")
+                //        Downloadfile(token, nodeUrl + version, nv.id, "results.xlsx").Wait();
+                //    if (nv.name == "results.json")
+                //        Downloadfile(token, nodeUrl + version, nv.id, "results.json").Wait();
+                //}
+
+
                 // Upload the data.
                 // 1) Create the file and get data serveur URI
                 string fileName = "qq_model_creation.csv";
@@ -151,17 +235,26 @@ namespace quantforce
                 if (status == 400)
                 {
                     // 5) Execute QQ
-                    ActionView av = new ActionView()
+                    ActionView av2 = new ActionView()
                     {
                         name = "TMPROCESS",
                         verb = "",
                         parameters = JObject.FromObject(new { DeliquencyDays = 90, DataFile = file.id })
                     };
-                    dynamic process = rest.PostAsync<JToken>(processURI + version + "/process/" + project.id + "/action", av).Result;
-                    status = WaitForTaskToCompleteAsync(process, rest, processURI + version);
+                    dynamic process2 = rest.PostAsync<JToken>(processURI + version + "/process/" + project.id + "/action", av2).Result;
+                    status = WaitForTaskToCompleteAsync(process2, rest, processURI + version);
                     // Get the result json
-                    Process_Out result = rest.GetAsync<Process_Out>(processURI + version + "/task/" + process.taskId + "/result").Result;
-                    Console.WriteLine(result.result.ToString());
+                    Process_Out result2 = rest.GetAsync<Process_Out>(processURI + version + "/task/" + process2.taskId + "/result").Result;
+                    Console.WriteLine(result2.result.ToString());
+                    // Find the files Excel et Json child from project
+                    var files2 = rest.GetAsync<List<NodeView>>(nodeUrl + version + "/file/" + project.id).Result;
+                    foreach (NodeView nv in files2)
+                    {
+                        if (nv.name == "results.xlsx")
+                            Downloadfile(token, nodeUrl + version, nv.id, "results.xlsx").Wait();
+                        if (nv.name == "results.json")
+                            Downloadfile(token, nodeUrl + version, nv.id, "results.json").Wait();
+                    }
                 }
             }
         }

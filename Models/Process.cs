@@ -34,6 +34,20 @@ namespace quantforce
     public class Process_Out : Common_Out
     {
         public JObject result;
+        public string excelId;
+        public string jsonId;
+    }
+
+    public class DataOut
+    {
+        public string chunkId;
+        public string MD5;
+    }
+
+    public class DataCheckout_Out : Common_Out
+    {
+        public string MD5_Final;
+        public List<DataOut> dataOut = new List<DataOut>();
     }
 
 }
