@@ -32,26 +32,26 @@ namespace quantforce
                 dataUri = node.inheritedJson.Value<string>("dataURI");
             if (dataUri != null)
             {
-                dynamic task = await rest.GetAsync<JObject>(dataUri + "/file/" + fileId + "/checkout");
+                dynamic task = await rest.GetAsync<JObject>(dataUri + "/api/v1/file/" + fileId + "/checkout");
                 while (task.taskId > 0 && task.state < 400)
                 {
                     await Task.Delay(1000);
-                    task = await rest.GetAsync<JObject>(dataUri + "/task/" + fileId);
+                    task = await rest.GetAsync<JObject>(dataUri + "/api/v1/task/" + task.taskId);
                 }
                 if (task.state == 400)
                 {
-                    dynamic taskResult = await rest.GetAsync<JObject>(dataUri + "/task/" + fileId + "/result");
-                    DataCheckout_Out co = taskResult.result.ToObject<DataCheckout_Out>();
+                    JToken taskResult = await rest.GetAsync<JToken>(dataUri + "/api/v1/task/" + task.taskId + "/result");
+                    DataCheckout_Out co = taskResult["result"]["DataCheckout_Out"].ToObject<DataCheckout_Out>();
                     try
                     {
                         using (System.IO.FileStream streamOut = System.IO.File.Create(fileName))
                         {
                             foreach (DataOut _do in co.dataOut)
                             {
-                                var chunk = await rest.SendAsync(System.Net.Http.HttpMethod.Get, dataUri + "/file/" + fileId + "/chunk/" + _do.chunkId);
+                                var chunk = await rest.SendAsync(System.Net.Http.HttpMethod.Get, dataUri + "/api/v1/file/" + fileId + "/chunk/" + _do.chunkId);
                                 chunk.EnsureSuccessStatusCode();
                                 var streamIn = await chunk.Content.ReadAsStreamAsync();
-                                await streamOut.CopyToAsync(streamIn);
+                                await streamIn.CopyToAsync(streamOut);
                             }
                         }
                         // Check the MD5
@@ -69,14 +69,14 @@ namespace quantforce
 
         static async Task<int> WaitForTaskToCompleteAsync(dynamic task, common.Helpers.Rest rest, string uri)
         {
-            int status = 0;
-            while (status < 400)
+            int state = 0;
+            while (state < 400)
             {
                 await Task.Delay(500);
                 dynamic taskResult = await rest.GetAsync<JToken>(uri + "/task/" + task.taskId);
-                status = taskResult.status;
+                state = taskResult.state;
             }
-            return status;
+            return state;
         }
 
         static public string GetHexa(byte[] hash)
@@ -102,7 +102,7 @@ namespace quantforce
 
             NodeView account = new NodeView();
             account.publicJson = new JObject();
-            account.publicJson["email"] = "test2@test.com";
+            account.publicJson["email"] = "test@test.com";
             account.publicJson["MD5password"] = "111"; // You only send password MD5, never send the real password
             account.publicJson["companyName"] = "acme";
             account.publicJson["lastName"] = "tom";
@@ -231,8 +231,8 @@ namespace quantforce
 
                 // 3) Attach the file to the node
                 dynamic task = rest.GetAsync<JToken>(dataURI + version + "/file/" + file.id + "/process?chunkCount=" + (chunk-1).ToString()).Result;
-                int status = WaitForTaskToCompleteAsync(task, rest, dataURI + version).Result;
-                if (status == 400)
+                int state = WaitForTaskToCompleteAsync(task, rest, dataURI + version).Result;
+                if (state == 400)
                 {
                     // 5) Execute QQ
                     ActionView av2 = new ActionView()
@@ -242,18 +242,23 @@ namespace quantforce
                         parameters = JObject.FromObject(new { DeliquencyDays = 90, DataFile = file.id })
                     };
                     dynamic process2 = rest.PostAsync<JToken>(processURI + version + "/process/" + project.id + "/action", av2).Result;
-                    status = WaitForTaskToCompleteAsync(process2, rest, processURI + version);
+                    state = WaitForTaskToCompleteAsync(process2, rest, processURI + version).Result;
                     // Get the result json
-                    Process_Out result2 = rest.GetAsync<Process_Out>(processURI + version + "/task/" + process2.taskId + "/result").Result;
-                    Console.WriteLine(result2.result.ToString());
+                    JToken result2 = rest.GetAsync<JToken>(processURI + version + "/task/" + process2.taskId + "/result").Result;
+                    Console.WriteLine(result2);
                     // Find the files Excel et Json child from project
-                    var files2 = rest.GetAsync<List<NodeView>>(nodeUrl + version + "/file/" + project.id).Result;
-                    foreach (NodeView nv in files2)
+                    var files2 = rest.GetAsync<List<NodeView>>(nodeUrl + version + "/file?parentId=" + project.id).Result;
+                    var p = files2.Find(a => a.name == "project");
+                    if (p!=null)
                     {
-                        if (nv.name == "results.xlsx")
-                            Downloadfile(token, nodeUrl + version, nv.id, "results.xlsx").Wait();
-                        if (nv.name == "results.json")
-                            Downloadfile(token, nodeUrl + version, nv.id, "results.json").Wait();
+                        var files3 = rest.GetAsync<List<NodeView>>(nodeUrl + version + "/file?parentId=" + p.id).Result;
+                        foreach (NodeView nv in files3)
+                        {
+                            if (nv.name == "results.xlsx")
+                                Downloadfile(token, nodeUrl + version, nv.id, "results.xlsx").Wait();
+                            if (nv.name == "results.json")
+                                Downloadfile(token, nodeUrl + version, nv.id, "results.json").Wait();
+                        }
                     }
                 }
             }
