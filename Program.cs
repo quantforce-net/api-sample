@@ -64,6 +64,7 @@ namespace quantforce
                         throw ex;
                     }
                 }
+                await rest.GetAsync<JObject>(dataUri + "/api/v1/file/" + fileId + "/finished");
             }
         }
 
