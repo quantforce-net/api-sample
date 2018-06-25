@@ -12,7 +12,7 @@ You should provide a two year invoice file to build the model. This file is comp
 - Invoice effective payment date (PD)
 - Invoie amount (AM)
     
-Id are string, date are in format dd/mm/yy or dd/mm/yyyy, amount are decimal with point or coma separator. You can add other columns they will be ignore. You cna use , ; or tab for column separator.
+Id are string, date are in format dd/mm/yy or dd/mm/yyyy, amount are decimal with point or coma separator. You can add other columns they will be ignore. You can use , ; or tab for column separator.
 
 For example
 
