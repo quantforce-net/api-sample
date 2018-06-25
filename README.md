@@ -5,12 +5,12 @@ QuantQollect is a subset of Quantforce engine that offer bad payer detection 3 m
 # How it works?
 
 You should provide a two year invoice file to build the model. This file is composed of these mandatory columns
-    - Cutomer id (ID)
-    - Invoice id (VID)
-    - Invoice date (VD)
-    - Invoide term date (TD)
-    - Invoice effective payment date (PD)
-    - Invoie amount (AM)
+- Cutomer id (ID)
+- Invoice id (VID)
+- Invoice date (VD)
+- Invoide term date (TD)
+- Invoice effective payment date (PD)
+- Invoie amount (AM)
     
 Id are string, date are in format dd/mm/yy or dd/mm/yyyy, amount are decimal with point or coma separator. You can add other columns they will be ignore. You cna use , ; or tab for column separator.
 
