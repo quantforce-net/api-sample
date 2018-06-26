@@ -29,7 +29,7 @@ This token should be put in each HTTP request header (see Rest.cs file)
 `token: FAE04EC0-301F-11D3-BF4B-00C04F79EFBC`
 
 # Node
-With this token you have acces to nodes. A node is a generic JSON container with one parent and as many child as you want. This node tree concept allows you to organise as you want. You can save personnal data (metadata) in a node, for example your customer id.
+With this token you have access to nodes. A node is a generic JSON container with one parent and as many child as you want. This node tree concept allows you to organise as you want. You can save personnal data (metadata) in a node, for example your customer id.
 
 Look at the NodeView.cs file for structure description.
 
