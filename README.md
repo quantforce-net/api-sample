@@ -2,7 +2,7 @@
 
 QuantQollect is a subset of Quantforce engine that offer bad payer detection 3 month in advance. This Github provide a commented example on how to use this API.
 
-# How it works?
+# How does it work?
 
 You should provide a two year invoice file to build the model. This file is composed of these mandatory columns
 - Cutomer id (ID) ==> customer
