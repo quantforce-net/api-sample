@@ -47,4 +47,5 @@ A task
 # File transfert
 Because files can be very huge you can split then and send then chunk by chunk. When all chunk are uploaded you call "process" on the file API.
 
+---
 Have a look at C# example code for a detailed view on how to use QuantQollect API
